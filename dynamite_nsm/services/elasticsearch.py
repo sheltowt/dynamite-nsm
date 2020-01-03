@@ -567,7 +567,7 @@ class ElasticInstaller:
         utilities.set_ownership_of_file('/etc/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/opt/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/var/log/dynamite', user='dynamite', group='dynamite')
-        if self.setup_passwords:
+        if self.setup_bootstrap_passwords:
             es_config.enable_xpack_security()
             self.setup_passwords()
         elif self.setup_transport_certificate:
