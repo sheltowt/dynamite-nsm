@@ -540,13 +540,14 @@ class ElasticInstaller:
         subprocess.call('mkdir -p {}'.format(os.path.join(self.configuration_directory, 'config')), shell=True)
         es_cert_util = os.path.join(self.install_directory, 'bin', 'elasticsearch-certutil')
         es_cert_keystore = os.path.join(self.configuration_directory, 'config', 'elastic-certificates.p12')
-        cert_p = subprocess.Popen([es_cert_util, 'cert', '-out', es_cert_keystore, '-pass', ''],
-                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
-                                  env=env_dict)
-        cert_p_res = cert_p.communicate()
         if not os.path.exists(es_cert_keystore):
-            sys.stderr.write('[-] Failed to setup SSL certificate keystore: \noutput: {}\n\t'.format(cert_p_res))
-            return False
+            cert_p = subprocess.Popen([es_cert_util, 'cert', '-out', es_cert_keystore, '-pass', ''],
+                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
+                                      env=env_dict)
+            cert_p_res = cert_p.communicate()
+            if not os.path.exists(es_cert_keystore):
+                sys.stderr.write('[-] Failed to setup SSL certificate keystore: \noutput: {}\n\t'.format(cert_p_res))
+                return False
         utilities.set_ownership_of_file(os.path.join(self.configuration_directory, 'config'),
                                         user='dynamite', group='dynamite')
         return True
@@ -631,6 +632,7 @@ class ElasticProfiler:
         self.is_configured = self._is_configured(stderr=stderr)
         self.is_running = self._is_running()
         self.is_listening = self._is_listening(stderr=stderr)
+        self.is_password_enabled = self._is_password_enabled()
 
     def __str__(self):
         return json.dumps({
@@ -638,7 +640,8 @@ class ElasticProfiler:
             'INSTALLED': self.is_installed,
             'CONFIGURED': self.is_configured,
             'RUNNING': self.is_running,
-            'LISTENING': self.is_listening
+            'LISTENING': self.is_listening,
+            'PASSWORD_ENABLED': self.is_password_enabled
         }, indent=1)
 
     @staticmethod
@@ -716,6 +719,14 @@ class ElasticProfiler:
                 sys.stderr.write('[-] Un-parsable elasticsearch.yml or jvm.options \n')
             return False
         return True
+
+    @staticmethod
+    def _is_password_enabled():
+        if ElasticProfiler._is_configured(stderr=False):
+            env_dict = utilities.get_environment_file_dict()
+            es_path_conf = env_dict.get('ES_PATH_CONF')
+            return ElasticConfigurator(configuration_directory=es_path_conf).get_xpack_security()
+        return False
 
     @staticmethod
     def _is_running():
@@ -912,6 +923,12 @@ def install_elasticsearch(setup_bootstrap_passwords=True, setup_transport_certif
     """
     es_profiler = ElasticProfiler()
     if es_profiler.is_installed:
+        if setup_bootstrap_passwords and not es_profiler.is_password_enabled:
+            es_installer = ElasticInstaller(setup_bootstrap_passwords=setup_bootstrap_passwords,
+                                            setup_transport_certificate=setup_transport_certificate, password=password,
+                                            download_elasticsearch_archive=not es_profiler.is_downloaded,
+                                            stdout=stdout, verbose=verbose)
+            es_installer.setup_passwords()
         sys.stderr.write('[-] ElasticSearch is already installed. If you wish to re-install, first uninstall.\n')
         return False
     if utilities.get_memory_available_bytes() < 6 * (1000 ** 3):
