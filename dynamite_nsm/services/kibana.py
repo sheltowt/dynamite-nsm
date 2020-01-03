@@ -61,10 +61,17 @@ class KibanaAPIConfigurator:
         # Shelling out is a reasonable workaround
         kibana_api_import_url = '{}:{}/api/saved_objects/_import'.format(server_host,
                     self.kibana_config.get_server_port())
-        curl_command = 'curl -X POST {} -u {}:"{}" --form file=@{} -H "kbn-xsrf: true" ' \
-                       '-H "Content-Type: multipart/form-data" -v'.format(
-            kibana_api_import_url, 'kibana', self.kibana_config.get_elasticsearch_password(), kibana_api_objects_path
-        )
+        kibana_username, kibana_password = self.kibana_config.get_elasticsearch_username(), \
+                                           self.kibana_config.get_elasticsearch_password()
+        if kibana_username and kibana_password:
+            curl_command = 'curl -X POST {} -u {}:"{}" --form file=@{} -H "kbn-xsrf: true" ' \
+                           '-H "Content-Type: multipart/form-data" -v'.format(
+                kibana_api_import_url, kibana_username, kibana_password, kibana_api_objects_path)
+        else:
+            curl_command = 'curl -X POST {} --form file=@{} -H "kbn-xsrf: true" ' \
+                           '-H "Content-Type: multipart/form-data" -v'.format(
+                kibana_api_import_url, kibana_api_objects_path)
+
         p = subprocess.Popen(curl_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
         out, err = p.communicate()
         out, err = out.decode('utf-8'), err.decode('utf-8')
@@ -127,6 +134,9 @@ class KibanaConfigurator:
             elif line.startswith('KIBANA_LOGS'):
                 self.kibana_logs = line.split('=')[1].strip()
 
+    def enable_elasticsearch_authentication(self):
+        self.kb_config_options['xpack.security.enabled'] = True
+
     def get_server_host(self):
         """
         :return: The host the Kibana is running on
@@ -147,9 +157,15 @@ class KibanaConfigurator:
 
     def get_elasticsearch_password(self):
         """
-        :return: The password to the ElasticSearch 'kibana' user
+        :return: The password to the ElasticSearch given user
         """
         return self.kb_config_options['elasticsearch.password']
+
+    def get_elasticsearch_username(self):
+        """
+        :return: The username to the ElasticSearch
+        """
+        return self.kb_config_options['elasticsearch.username']
 
     def set_server_host(self, host='0.0.0.0'):
         """
@@ -173,9 +189,15 @@ class KibanaConfigurator:
 
     def set_elasticsearch_password(self, password):
         """
-        :param password: The ElasticSearch password for the 'kibana' user
+        :param password: The ElasticSearch password for the given user
         """
         self.kb_config_options['elasticsearch.password'] = password
+
+    def set_elasticsearch_username(self, username):
+        """
+        :param username: The ElasticSearch username
+        """
+        self.kb_config_options['elasticsearch.username'] = username
 
     def write_configs(self):
         """
@@ -206,6 +228,7 @@ class KibanaInstaller:
                  port=5601,
                  elasticsearch_host=None,
                  elasticsearch_port=None,
+                 elasticsearch_username='elastic',
                  elasticsearch_password='changeme',
                  install_directory=INSTALL_DIRECTORY,
                  configuration_directory=CONFIGURATION_DIRECTORY,
@@ -230,6 +253,7 @@ class KibanaInstaller:
         self.port = port
         self.elasticsearch_host = elasticsearch_host
         self.elasticsearch_port = elasticsearch_port
+        self.elasticsearch_username = elasticsearch_username
         self.elasticsearch_password = elasticsearch_password
         if not elasticsearch_host:
             if ElasticProfiler().is_installed:
@@ -360,7 +384,7 @@ class KibanaInstaller:
                 sys.stdout.write('[+] Successfully created dashboards/visualizations.\n')
             kibana_process.stop()
 
-    def _setup_default_kibana_configs(self):
+    def _setup_default_kibana_configs(self, setup_elasticsearch_authentication=True):
         if self.stdout:
             sys.stdout.write('[+] Overwriting default configuration.\n')
         shutil.copy(os.path.join(const.DEFAULT_CONFIGS, 'kibana', 'kibana.yml'),
@@ -370,7 +394,9 @@ class KibanaInstaller:
                                                                     self.elasticsearch_port)])
         local_config.set_server_host(self.host)
         local_config.set_server_port(self.port)
-        local_config.set_elasticsearch_password(self.elasticsearch_password)
+        if setup_elasticsearch_authentication:
+            local_config.set_elasticsearch_password(self.elasticsearch_password)
+            local_config.set_elasticsearch_username(self.elasticsearch_username)
         local_config.write_configs()
 
     @staticmethod
@@ -402,7 +428,7 @@ class KibanaInstaller:
         except IOError as e:
             sys.stderr.write('[-] An error occurred while attempting to extract file. [{}]\n'.format(e))
 
-    def setup_kibana(self):
+    def setup_kibana(self, setup_elasticsearch_authentication=True):
         """
         Create required directories, files, and variables to run ElasticSearch successfully;
         """
@@ -412,7 +438,7 @@ class KibanaInstaller:
         self._create_kibana_directories()
         self._copy_kibana_files_and_directories()
         self._create_kibana_environment_variables()
-        self._setup_default_kibana_configs()
+        self._setup_default_kibana_configs(setup_elasticsearch_authentication=setup_elasticsearch_authentication)
         self._install_kibana_objects()
         utilities.set_ownership_of_file('/etc/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/opt/dynamite/', user='dynamite', group='dynamite')
@@ -682,7 +708,8 @@ def change_kibana_elasticsearch_password(password='changeme', prompt_user=True, 
 
 
 def install_kibana(elasticsearch_host='localhost', elasticsearch_port=9200, elasticsearch_password='changeme',
-                   install_jdk=True, create_dynamite_user=True, stdout=False, verbose=False):
+                   install_jdk=True, create_dynamite_user=True, setup_elasticsearch_authentication=True,
+                   stdout=False, verbose=False):
     """
     Install Kibana/ElastiFlow Dashboards
 
@@ -717,7 +744,7 @@ def install_kibana(elasticsearch_host='localhost', elasticsearch_port=9200, elas
             utilities.setup_java()
         if create_dynamite_user:
             utilities.create_dynamite_user(utilities.generate_random_password(50))
-        kb_installer.setup_kibana()
+        kb_installer.setup_kibana(setup_elasticsearch_authentication=setup_elasticsearch_authentication)
     except Exception:
         sys.stderr.write('[-] A fatal error occurred while attempting to install Kibana: ')
         traceback.print_exc(file=sys.stderr)

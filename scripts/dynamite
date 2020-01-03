@@ -317,15 +317,21 @@ if __name__ == '__main__':
         elif args.component == 'kibana':
             utilities.print_dynamite_logo()
             time.sleep(1)
-            if args.initial_password:
+            if args.skip_password_setup:
+                password = None
+                setup_elasticsearch_authentication = False
+            elif args.initial_password:
                 password = args.initial_password
+                setup_elasticsearch_authentication = True
             else:
                 password = utilities.prompt_password(
                     'Enter the password used for logging into ElasticSearch: '
                 )
+                setup_elasticsearch_authentication = True
             if not elasticsearch.ElasticProfiler().is_installed:
                 if kibana.install_kibana(elasticsearch_host=args.es_host, elasticsearch_port=args.es_port,
                                          elasticsearch_password=password,
+                                         setup_elasticsearch_authentication=setup_elasticsearch_authentication,
                                          stdout=True, create_dynamite_user=True, install_jdk=True, verbose=args.debug):
                     sys.exit(0)
                 else:

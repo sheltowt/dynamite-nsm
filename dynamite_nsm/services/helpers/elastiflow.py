@@ -191,15 +191,18 @@ class ElastiFlowInstaller:
             template_path = os.path.join(self.install_directory, 'templates')
             if stdout:
                 sys.stdout.write('[+] Updating Elastiflow template configuration path [{}]\n'.format(template_path))
-            subprocess.call('echo ELASTIFLOW_TEMPLATE_PATH="{}" >> /etc/dynamite/environment'.format(template_path), shell=True)
+            subprocess.call('echo ELASTIFLOW_TEMPLATE_PATH="{}" >> /etc/dynamite/environment'.format(template_path),
+                            shell=True)
         if 'ELASTIFLOW_GEOIP_DB_PATH' not in open('/etc/dynamite/environment').read():
             geo_path = os.path.join(self.install_directory, 'geoipdbs')
             if stdout:
                 sys.stdout.write('[+] Updating Elastiflow geodb configuration path [{}]\n'.format(geo_path))
-            subprocess.call('echo ELASTIFLOW_GEOIP_DB_PATH="{}" >> /etc/dynamite/environment'.format(geo_path), shell=True)
+            subprocess.call('echo ELASTIFLOW_GEOIP_DB_PATH="{}" >> /etc/dynamite/environment'.format(geo_path),
+                            shell=True)
         if 'ELASTIFLOW_DEFINITION_PATH' not in open('/etc/dynamite/environment').read():
             def_path = os.path.join(self.install_directory, 'definitions')
             if stdout:
                 sys.stdout.write('[+] Updating Elastiflow definitions configuration path [{}]\n'.format(def_path))
-            subprocess.call('echo ELASTIFLOW_DEFINITION_PATH="{}" >> /etc/dynamite/environment'.format(def_path), shell=True)
+            subprocess.call('echo ELASTIFLOW_DEFINITION_PATH="{}" >> /etc/dynamite/environment'.format(def_path),
+                            shell=True)
         ElastiflowConfigurator().write_environment_variables()
