@@ -61,8 +61,8 @@ def _get_parser():
 
     parser.add_argument('--es-port', type=int, dest='es_port', default=9200,
                         help='Target ElasticSearch cluster; A valid port [1-65535]')
-    parser.add_argument('--no-password', type=str, dest='skip_password_setup', required=False,
-                        help='Proceed without password.')
+    parser.add_argument('--no-password', type=str, dest='skip_password_setup', required=False, default=False,
+                        help='Proceed without password.', action='store_true')
 
     parser.add_argument('--password', type=str, dest='initial_password', required=False,
                         help='The password for a component on first install (Bypass Prompt).')
