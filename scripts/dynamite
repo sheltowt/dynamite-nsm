@@ -799,10 +799,11 @@ if __name__ == '__main__':
             try:
                 sys.stdout.write('[+] Profiling ElasticSearch.\n')
                 profile_result = elasticsearch.ElasticProfiler(stderr=True)
-                sys.stdout.write('[+]  ELASTICSEARCH.INSTALLED: {}\n'.format(profile_result.is_installed))
-                sys.stdout.write('[+] ELASTICSEARCH.CONFIGURED: {}\n'.format(profile_result.is_configured))
-                sys.stdout.write('[+]    ELASTICSEARCH.RUNNING: {}\n'.format(profile_result.is_running))
-                sys.stdout.write('[+]     ELASTICSEARCH.API_UP: {}\n'.format(profile_result.is_listening))
+                sys.stdout.write('[+]         ELASTICSEARCH.INSTALLED: {}\n'.format(profile_result.is_installed))
+                sys.stdout.write('[+]        ELASTICSEARCH.CONFIGURED: {}\n'.format(profile_result.is_configured))
+                sys.stdout.write('[+]           ELASTICSEARCH.RUNNING: {}\n'.format(profile_result.is_running))
+                sys.stdout.write('[+]  ELASTICSEARCH.PASSWORD_ENABLED: {}\n'.format(profile_result.is_password_enabled))
+                sys.stdout.write('[+]            ELASTICSEARCH.API_UP: {}\n'.format(profile_result.is_listening))
                 sys.exit(0)
             except Exception:
                 _fatal_exception('profile', 'elasticsearch', args.debug)
