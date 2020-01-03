@@ -282,19 +282,19 @@ if __name__ == '__main__':
             time.sleep(1)
             if args.skip_password_setup:
                 password = None
-                setup_passwords = False
-                setup_certificates = True
+                setup_bootstrap_passwords = False
+                setup_transport_certificate = True
             elif args.initial_password:
                 password = args.initial_password
-                setup_passwords = True
-                setup_certificates = True
+                setup_bootstrap_passwords = True
+                setup_transport_certificate = True
             else:
                 password = utilities.prompt_password(prompt='Create a password for logging into ElasticSearch: ')
-                setup_passwords = True
-                setup_certificates = True
+                setup_bootstrap_passwords = True
+                setup_transport_certificate = True
             if elasticsearch.install_elasticsearch(password=password, create_dynamite_user=True, install_jdk=True,
-                                                   setup_passwords=setup_passwords,
-                                                   setup_certificates=setup_certificates,
+                                                   setup_bootstrap_passwords=setup_bootstrap_passwords,
+                                                   setup_transport_certificate=setup_transport_certificate,
                                                    stdout=True, verbose=args.debug):
                 sys.exit(0)
             else:
@@ -303,11 +303,17 @@ if __name__ == '__main__':
         elif args.component == 'logstash':
             utilities.print_dynamite_logo()
             time.sleep(1)
-            if args.initial_password:
+            if args.skip_password_setup:
+                password = None
+                setup_elasticsearch_authentication = False
+            elif args.initial_password:
                 password = args.initial_password
+                setup_elasticsearch_authentication = True
             else:
                 password = utilities.prompt_password(prompt='Create a password for logging into ElasticSearch: ')
+                setup_elasticsearch_authentication = True
             if logstash.install_logstash(elasticsearch_host=args.es_host, elasticsearch_port=args.es_port,
+                                         setup_elasticsearch_authentication=setup_elasticsearch_authentication,
                                          elasticsearch_password=password,
                                          stdout=True, create_dynamite_user=True, install_jdk=True, verbose=args.debug):
                 sys.exit(0)

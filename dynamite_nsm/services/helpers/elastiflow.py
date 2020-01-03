@@ -15,6 +15,7 @@ class ElastiflowConfigurator:
     """
     def __init__(self):
         self.es_passwd = 'changeme'
+        self.es_user = 'elastic'
         self.netflow_ipv4_host = '0.0.0.0'
         self.netflow_ipv6_host = '[::]'
         self.netflow_ipv4_port = 2055
@@ -55,6 +56,8 @@ class ElastiflowConfigurator:
         for line in open('/etc/dynamite/environment').readlines():
             if line.startswith('ELASTIFLOW_ES_PASSWD'):
                 self.es_passwd = line.split('=')[1].strip()
+            elif line.startswith('ELASTIFLOW_ES_USER'):
+                self.es_user = line.split('=')[1].strip()
             elif line.startswith('ELASTIFLOW_NETFLOW_IPV4_HOST'):
                 self.netflow_ipv4_host = line.split('=')[1].strip()
             elif line.startswith('ELASTIFLOW_NETFLOW_IPV4_PORT'):

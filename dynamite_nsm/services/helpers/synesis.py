@@ -16,6 +16,7 @@ class SynesisConfigurator:
 
     def __init__(self):
         self.suricata_es_passwd = 'changeme'
+        self.suricata_es_user = 'elastic'
         self.suricata_resolve_ip2host = True
         self.suricata_nameserver = '127.0.0.1'
         self.suricata_dns_hit_cache_size = 25000
@@ -32,6 +33,8 @@ class SynesisConfigurator:
         for line in open('/etc/dynamite/environment').readlines():
             if line.startswith('SYNLITE_SURICATA_ES_PASSWD'):
                 self.suricata_es_passwd = line.split('=')[1].strip()
+            elif line.startswith('SYNLITE_SURICATA_ES_USER'):
+                self.suricata_es_user = line.split('=')[1].strip()
             elif line.startswith('SYNLITE_SURICATA_RESOLVE_IP2HOST'):
                 self.suricata_resolve_ip2host = line.split('=')[1].strip()
             elif line.startswith('SYNLITE_SURICATA_NAMESERVER'):
@@ -48,6 +51,7 @@ class SynesisConfigurator:
                 self.suricata_es_host = line.split('=')[1].strip()
             elif line.startswith('SYNLITE_SURICATA_BEATS_HOST'):
                 self.suricata_beats_host = line.split('=')[1].strip()
+
             elif line.startswith('SYNLITE_SURICATA_BEATS_PORT'):
                 self.suricata_beats_port = line.split('=')[1].strip()
 

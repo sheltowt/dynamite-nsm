@@ -385,6 +385,8 @@ class ElasticInstaller:
     def __init__(self,
                  host='0.0.0.0',
                  port=9200,
+                 setup_bootstrap_passwords=True,
+                 setup_transport_certificate=True,
                  password='changeme',
                  configuration_directory=CONFIGURATION_DIRECTORY,
                  install_directory=INSTALL_DIRECTORY,
@@ -394,9 +396,11 @@ class ElasticInstaller:
                  verbose=False,
                  ):
         """
-        :param: host: The IP address to listen on (E.G "0.0.0.0")
-        :param: port: The port that the ES API is bound to (E.G 9200)
-        :param: password: The password used for authentication across all builtin users
+        :param host: The IP address to listen on (E.G "0.0.0.0")
+        :param port: The port that the ES API is bound to (E.G 9200)
+        :param setup_bootstrap_passwords: If True, bootstraps all builtin users with value in password field
+        :param setup_transport_certificate: If True, creates .p12 certificate for node-to-node encryption
+        :param password: The password used for authentication across all builtin users
         :param configuration_directory: Path to the configuration directory (E.G /etc/dynamite/elasticsearch/)
         :param install_directory: Path to the install directory (E.G /opt/dynamite/elasticsearch/)
         :param log_directory: Path to the log directory (E.G /var/log/dynamite/elasticsearch/)
@@ -407,6 +411,8 @@ class ElasticInstaller:
 
         self.host = host
         self.port = port
+        self.setup_bootstrap_passwords = setup_bootstrap_passwords
+        self.setup_transport_certificate = setup_transport_certificate
         self.password = password
         self.configuration_directory = configuration_directory
         self.install_directory = install_directory
@@ -523,7 +529,7 @@ class ElasticInstaller:
         except IOError as e:
             sys.stderr.write('[-] An error occurred while attempting to extract file. [{}]\n'.format(e))
 
-    def setup_transport_certificate(self):
+    def create_transport_certificate(self):
         """
         Creates a .p12 certificate at $ES_CONFIG/config for encrypting node communication
 
@@ -545,7 +551,7 @@ class ElasticInstaller:
                                         user='dynamite', group='dynamite')
         return True
 
-    def setup_elasticsearch(self, setup_passwords=True, setup_certificates=True):
+    def setup_elasticsearch(self):
         """
         Create required directories, files, and variables to run ElasticSearch successfully;
         Setup Java environment
@@ -561,12 +567,12 @@ class ElasticInstaller:
         utilities.set_ownership_of_file('/etc/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/opt/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/var/log/dynamite', user='dynamite', group='dynamite')
-        if setup_passwords:
+        if self.setup_passwords:
             es_config.enable_xpack_security()
             self.setup_passwords()
-        elif setup_certificates:
+        elif self.setup_transport_certificate:
             es_config.disable_xpack_security()
-            self.setup_transport_certificate()
+            self.create_transport_certificate()
         es_config.write_configs()
 
     def setup_passwords(self):
@@ -588,7 +594,7 @@ class ElasticInstaller:
         if not ElasticProfiler().is_installed:
             sys.stderr.write('[-] ElasticSearch must be installed and running to bootstrap passwords.\n')
             return False
-        self.setup_transport_certificate()
+        self.create_transport_certificate()
         if not ElasticProfiler().is_running:
             ElasticProcess().start(stdout=self.stdout)
             sys.stdout.flush()
@@ -889,11 +895,14 @@ def change_elasticsearch_password(old_password, password='changeme', stdout=Fals
     return es_pw_config.set_all_passwords(password, stdout=stdout)
 
 
-def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite_user=True,
-                          setup_passwords=True, setup_certificates=True, stdout=True, verbose=False):
+def install_elasticsearch(setup_bootstrap_passwords=True, setup_transport_certificate=True,
+                          password='changeme', install_jdk=True, create_dynamite_user=True,
+                          stdout=True, verbose=False):
     """
     Install ElasticSearch
 
+    :param setup_bootstrap_passwords: If True, bootstraps all builtin users with value in password field
+    :param setup_transport_certificate: If True, creates .p12 certificate for node-to-node encryption
     :param password: The password used for authentication across all builtin users
     :param install_jdk: Install the latest OpenJDK that will be used by Logstash/ElasticSearch
     :param create_dynamite_user: Automatically create the 'dynamite' user, who has privs to run Logstash/ElasticSearch
@@ -911,7 +920,9 @@ def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite
         ))
         return False
     try:
-        es_installer = ElasticInstaller(password=password, download_elasticsearch_archive=not es_profiler.is_downloaded,
+        es_installer = ElasticInstaller(setup_bootstrap_passwords=setup_bootstrap_passwords,
+                                        setup_transport_certificate=setup_transport_certificate,password=password,
+                                        download_elasticsearch_archive=not es_profiler.is_downloaded,
                                         stdout=stdout, verbose=verbose)
         if install_jdk:
             utilities.download_java(stdout=stdout)
@@ -919,7 +930,7 @@ def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite
             utilities.setup_java()
         if create_dynamite_user:
             utilities.create_dynamite_user(utilities.generate_random_password(50))
-        es_installer.setup_elasticsearch(setup_passwords=setup_passwords, setup_certificates=setup_certificates)
+        es_installer.setup_elasticsearch()
     except Exception:
         sys.stderr.write('[-] A fatal error occurred while attempting to install ElasticSearch: ')
         traceback.print_exc(file=sys.stderr)

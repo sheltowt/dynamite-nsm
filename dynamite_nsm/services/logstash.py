@@ -158,6 +158,18 @@ class LogstashConfigurator:
         elastiflow_config.write_environment_variables()
         synesis_config.write_environment_variables()
 
+    @staticmethod
+    def set_elasticsearch_username(username):
+        """
+        :param username: The new username
+        """
+        elastiflow_config = elastiflow.ElastiflowConfigurator()
+        synesis_config = synesis.SynesisConfigurator()
+        elastiflow_config.es_user = username
+        synesis_config.suricata_es_user = username
+        elastiflow_config.write_environment_variables()
+        synesis_config.write_environment_variables()
+
     def set_log_path(self, path):
         """
         :param path: The path to Logstash logs on the filesystem
@@ -228,6 +240,8 @@ class LogstashInstaller:
                  host='0.0.0.0',
                  elasticsearch_host='localhost',
                  elasticsearch_port=9200,
+                 setup_elasticsearch_authentication=True,
+                 elasticsearch_username='elastic',
                  elasticsearch_password='changeme',
                  configuration_directory=CONFIGURATION_DIRECTORY,
                  install_directory=INSTALL_DIRECTORY,
@@ -258,6 +272,8 @@ class LogstashInstaller:
         self.elasticsearch_port = elasticsearch_port
         self.configuration_directory = configuration_directory
         self.install_directory = install_directory
+        self.setup_elasticsearch_authentication = setup_elasticsearch_authentication
+        self.elasticsearch_username = elasticsearch_username
         self.elasticsearch_password = elasticsearch_password
         self.log_directory = log_directory
         self.stdout = stdout
@@ -392,7 +408,12 @@ class LogstashInstaller:
         ef_config.sflow_ipv4_host = self.host
         ef_config.zeek_ipv4_host = self.host
         ef_config.es_host = self.elasticsearch_host + ':' + str(self.elasticsearch_port)
-        ef_config.es_passwd = self.elasticsearch_password
+        if self.setup_elasticsearch_authentication:
+            ef_config.es_passwd = self.elasticsearch_password
+            ef_config.es_user = self.elasticsearch_username
+        else:
+            ef_config.es_passwd = ''
+            ef_config.es_user = ''
         ef_config.write_environment_variables()
 
     def _setup_synesis(self):
@@ -401,7 +422,12 @@ class LogstashInstaller:
         syn_config = synesis.SynesisConfigurator()
         syn_config.suricata_es_host = self.elasticsearch_host + ':' + str(self.elasticsearch_port)
         syn_config.suricata_resolve_ip2host = True
-        syn_config.suricata_es_passwd = self.elasticsearch_password
+        if self.setup_elasticsearch_authentication:
+            syn_config.suricata_es_passwd = self.elasticsearch_password
+            syn_config.suricata_es_user = self.elasticsearch_username
+        else:
+            syn_config.suricata_es_passwd = ''
+            syn_config.suricata_es_user = ''
         syn_config.write_environment_variables()
 
     @staticmethod
@@ -771,6 +797,7 @@ def change_logstash_elasticsearch_password(password='changeme', prompt_user=True
 def install_logstash(host='0.0.0.0',
                      elasticsearch_host='localhost',
                      elasticsearch_port=9200,
+                     setup_elasticsearch_authentication=True,
                      elasticsearch_password='changeme',
                      install_jdk=True,
                      create_dynamite_user=True,
@@ -802,6 +829,7 @@ def install_logstash(host='0.0.0.0',
             return False
     try:
         ls_installer = LogstashInstaller(host=host,
+                                         setup_elasticsearch_authentication=setup_elasticsearch_authentication,
                                          elasticsearch_host=elasticsearch_host,
                                          elasticsearch_port=elasticsearch_port,
                                          elasticsearch_password=elasticsearch_password,
