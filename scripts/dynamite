@@ -61,12 +61,13 @@ def _get_parser():
 
     parser.add_argument('--es-port', type=int, dest='es_port', default=9200,
                         help='Target ElasticSearch cluster; A valid port [1-65535]')
+    parser.add_argument('--no-password', type=str, dest='skip_password_setup', required=False,
+                        help='Proceed without password.')
 
     parser.add_argument('--password', type=str, dest='initial_password', required=False,
-                        help='The password for a component on first install.')
+                        help='The password for a component on first install (Bypass Prompt).')
 
     # Config Modes
-
     parser.add_argument('--zeek-cluster', default=False, dest='config_zeek_cluster', action='store_true',
                         help='Enter into Zeek Cluster Configuration Mode.')
     parser.add_argument('--zeek-scripts', default=False, dest='config_zeek_scripts', action='store_true',
@@ -279,13 +280,22 @@ if __name__ == '__main__':
         elif args.component == 'elasticsearch':
             utilities.print_dynamite_logo()
             time.sleep(1)
-            if args.initial_password:
+            if args.skip_password_setup:
+                password = None
+                setup_passwords = False
+                setup_certificates = True
+            elif args.initial_password:
                 password = args.initial_password
+                setup_passwords = True
+                setup_certificates = True
             else:
                 password = utilities.prompt_password(prompt='Create a password for logging into ElasticSearch: ')
-            if elasticsearch.install_elasticsearch(
-                password=password,
-                    stdout=True, create_dynamite_user=True, install_jdk=True, verbose=args.debug):
+                setup_passwords = True
+                setup_certificates = True
+            if elasticsearch.install_elasticsearch(password=password, create_dynamite_user=True, install_jdk=True,
+                                                   setup_passwords=setup_passwords,
+                                                   setup_certificates=setup_certificates,
+                                                   stdout=True, verbose=args.debug):
                 sys.exit(0)
             else:
                 sys.stderr.write('[-] Failed to install ElasticSearch.\n')

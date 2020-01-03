@@ -114,6 +114,12 @@ class ElasticConfigurator:
             new_output += '\n'
         open(os.path.join(self.configuration_directory, 'jvm.options'), 'w').write(new_output)
 
+    def disable_xpack_security(self):
+        self.es_config_options['xpack.security.enabled'] = False
+
+    def enable_xpack_security(self):
+        self.es_config_options['xpack.security.enabled'] = True
+
     def get_cluster_name(self):
         """
         :return: The name of the ElasticSearch cluster
@@ -167,6 +173,12 @@ class ElasticConfigurator:
         :return: The maximum amount of memory the JVM heap allocates
         """
         return self.jvm_config_options.get('maximum_memory')
+
+    def get_xpack_security(self):
+        """
+        :return: True if password is enabled
+        """
+        return self.es_config_options.get('xpack.security.enabled')
 
     def set_cluster_name(self, name):
         """
@@ -511,7 +523,29 @@ class ElasticInstaller:
         except IOError as e:
             sys.stderr.write('[-] An error occurred while attempting to extract file. [{}]\n'.format(e))
 
-    def setup_elasticsearch(self):
+    def setup_transport_certificate(self):
+        """
+        Creates a .p12 certificate at $ES_CONFIG/config for encrypting node communication
+
+        :return: True, if created successfully
+        """
+        env_dict = utilities.get_environment_file_dict()
+        sys.stdout.write('[+] Creating certificate keystore\n')
+        subprocess.call('mkdir -p {}'.format(os.path.join(self.configuration_directory, 'config')), shell=True)
+        es_cert_util = os.path.join(self.install_directory, 'bin', 'elasticsearch-certutil')
+        es_cert_keystore = os.path.join(self.configuration_directory, 'config', 'elastic-certificates.p12')
+        cert_p = subprocess.Popen([es_cert_util, 'cert', '-out', es_cert_keystore, '-pass', ''],
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
+                                  env=env_dict)
+        cert_p_res = cert_p.communicate()
+        if not os.path.exists(es_cert_keystore):
+            sys.stderr.write('[-] Failed to setup SSL certificate keystore: \noutput: {}\n\t'.format(cert_p_res))
+            return False
+        utilities.set_ownership_of_file(os.path.join(self.configuration_directory, 'config'),
+                                        user='dynamite', group='dynamite')
+        return True
+
+    def setup_elasticsearch(self, setup_passwords=True, setup_certificates=True):
         """
         Create required directories, files, and variables to run ElasticSearch successfully;
         Setup Java environment
@@ -521,10 +555,19 @@ class ElasticInstaller:
         self._create_elasticsearch_environment_variables()
         self._setup_default_elasticsearch_configs()
         self._update_sysctl()
+        env_dict = utilities.get_environment_file_dict()
+        es_path_conf = env_dict.get('ES_PATH_CONF')
+        es_config = ElasticConfigurator(es_path_conf)
         utilities.set_ownership_of_file('/etc/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/opt/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/var/log/dynamite', user='dynamite', group='dynamite')
-        self.setup_passwords()
+        if setup_passwords:
+            es_config.enable_xpack_security()
+            self.setup_passwords()
+        elif setup_certificates:
+            es_config.disable_xpack_security()
+            self.setup_transport_certificate()
+        es_config.write_configs()
 
     def setup_passwords(self):
         env_dict = utilities.get_environment_file_dict()
@@ -545,19 +588,7 @@ class ElasticInstaller:
         if not ElasticProfiler().is_installed:
             sys.stderr.write('[-] ElasticSearch must be installed and running to bootstrap passwords.\n')
             return False
-        sys.stdout.write('[+] Creating certificate keystore\n')
-        subprocess.call('mkdir -p {}'.format(os.path.join(self.configuration_directory, 'config')), shell=True)
-        es_cert_util = os.path.join(self.install_directory, 'bin', 'elasticsearch-certutil')
-        es_cert_keystore = os.path.join(self.configuration_directory, 'config', 'elastic-certificates.p12')
-        cert_p = subprocess.Popen([es_cert_util, 'cert', '-out', es_cert_keystore, '-pass', ''],
-                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
-                                  env=env_dict)
-        cert_p_res = cert_p.communicate()
-        if not os.path.exists(es_cert_keystore):
-            sys.stderr.write('[-] Failed to setup SSL certificate keystore: \noutput: {}\n\t'.format(cert_p_res))
-            return False
-        utilities.set_ownership_of_file(os.path.join(self.configuration_directory, 'config'),
-                                        user='dynamite', group='dynamite')
+        self.setup_transport_certificate()
         if not ElasticProfiler().is_running:
             ElasticProcess().start(stdout=self.stdout)
             sys.stdout.flush()
@@ -858,8 +889,8 @@ def change_elasticsearch_password(old_password, password='changeme', stdout=Fals
     return es_pw_config.set_all_passwords(password, stdout=stdout)
 
 
-def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite_user=True, stdout=True,
-                          verbose=False):
+def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite_user=True,
+                          setup_passwords=True, setup_certificates=True, stdout=True, verbose=False):
     """
     Install ElasticSearch
 
@@ -888,7 +919,7 @@ def install_elasticsearch(password='changeme', install_jdk=True, create_dynamite
             utilities.setup_java()
         if create_dynamite_user:
             utilities.create_dynamite_user(utilities.generate_random_password(50))
-        es_installer.setup_elasticsearch()
+        es_installer.setup_elasticsearch(setup_passwords=setup_passwords, setup_certificates=setup_certificates)
     except Exception:
         sys.stderr.write('[-] A fatal error occurred while attempting to install ElasticSearch: ')
         traceback.print_exc(file=sys.stderr)
