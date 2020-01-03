@@ -765,16 +765,12 @@ def install_kibana(elasticsearch_host='localhost', elasticsearch_port=9200, setu
 def install_kibana_objects(elasticsearch_host='localhost',
                            elasticsearch_port=9200, elasticsearch_authentication=True,
                            elasticsearch_password='changeme', stdout=False, verbose=False):
-    kb_profiler = KibanaProfiler()
-    if kb_profiler.is_installed:
-        sys.stderr.write('[-] Kibana is already installed. If you wish to re-install, first uninstall.\n')
-        return False
     try:
         kb_installer = KibanaInstaller(setup_elasticsearch_authentication=elasticsearch_authentication,
                                        elasticsearch_host=elasticsearch_host,
                                        elasticsearch_port=elasticsearch_port,
                                        elasticsearch_password=elasticsearch_password,
-                                       download_kibana_archive=not kb_profiler.is_downloaded,
+                                       download_kibana_archive=False,
                                        stdout=stdout, verbose=verbose)
         kb_installer.install_kibana_objects()
         return True
