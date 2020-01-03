@@ -923,13 +923,6 @@ def install_elasticsearch(setup_bootstrap_passwords=True, setup_transport_certif
     """
     es_profiler = ElasticProfiler()
     if es_profiler.is_installed:
-        if setup_bootstrap_passwords and not es_profiler.is_password_enabled:
-            es_installer = ElasticInstaller(setup_bootstrap_passwords=setup_bootstrap_passwords,
-                                            setup_transport_certificate=setup_transport_certificate, password=password,
-                                            download_elasticsearch_archive=not es_profiler.is_downloaded,
-                                            stdout=stdout, verbose=verbose)
-            es_installer.setup_passwords()
-            return True
         sys.stderr.write('[-] ElasticSearch is already installed. If you wish to re-install, first uninstall.\n')
         return False
     if utilities.get_memory_available_bytes() < 6 * (1000 ** 3):

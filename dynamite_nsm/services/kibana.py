@@ -339,7 +339,7 @@ class KibanaInstaller:
             subprocess.call('echo KIBANA_LOGS="{}" >> /etc/dynamite/environment'.format(self.log_directory),
                             shell=True)
 
-    def _install_kibana_objects(self):
+    def install_kibana_objects(self):
         if KibanaProfiler().is_installed and (ElasticProfiler().is_installed or self.elasticsearch_host != 'localhost'):
             if self.stdout:
                 sys.stdout.write('[+] Installing Kibana Dashboards\n')
@@ -445,7 +445,7 @@ class KibanaInstaller:
         self._copy_kibana_files_and_directories()
         self._create_kibana_environment_variables()
         self._setup_default_kibana_configs()
-        self._install_kibana_objects()
+        self.install_kibana_objects()
         utilities.set_ownership_of_file('/etc/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/opt/dynamite/', user='dynamite', group='dynamite')
         utilities.set_ownership_of_file('/var/log/dynamite', user='dynamite', group='dynamite')
@@ -757,10 +757,31 @@ def install_kibana(elasticsearch_host='localhost', elasticsearch_port=9200, setu
         traceback.print_exc(file=sys.stderr)
         return False
     if stdout:
-        sys.stdout.write('[+] *** Kibana + Dashboards installed successfully. ***\n\n')
         sys.stdout.write('[+] Next, Start your collector: \'dynamite start kibana\'.\n')
         sys.stdout.flush()
     return KibanaProfiler(stderr=False).is_installed
+
+
+def install_kibana_objects(elasticsearch_host='localhost',
+                           elasticsearch_port=9200, setup_elasticsearch_authentication=True,
+                           elasticsearch_password='changeme', stdout=False, verbose=False):
+    kb_profiler = KibanaProfiler()
+    if kb_profiler.is_installed:
+        sys.stderr.write('[-] Kibana is already installed. If you wish to re-install, first uninstall.\n')
+        return False
+    try:
+        kb_installer = KibanaInstaller(setup_elasticsearch_authentication=setup_elasticsearch_authentication,
+                                       elasticsearch_host=elasticsearch_host,
+                                       elasticsearch_port=elasticsearch_port,
+                                       elasticsearch_password=elasticsearch_password,
+                                       download_kibana_archive=not kb_profiler.is_downloaded,
+                                       stdout=stdout, verbose=verbose)
+        kb_installer.install_kibana_objects()
+        return True
+    except Exception:
+        sys.stderr.write('[-] A fatal error occurred while attempting to install Kibana Dashboards: ')
+        traceback.print_exc(file=sys.stderr)
+        return False
 
 
 def uninstall_kibana(stdout=False, prompt_user=True):
