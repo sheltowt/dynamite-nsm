@@ -178,7 +178,7 @@ class ElasticConfigurator:
         """
         :return: True if password is enabled
         """
-        return self.es_config_options.get('xpack.security.enabled')
+        return self.es_config_options.get('xpack.security.enabled') == 'true'
 
     def set_cluster_name(self, name):
         """
