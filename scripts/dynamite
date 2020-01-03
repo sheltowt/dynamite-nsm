@@ -366,7 +366,7 @@ if __name__ == '__main__':
                 else:
                     sys.stderr.write('[-] Failed to install Kibana.\n')
                     sys.exit(1)
-        elif args.components == 'kibana-objects':
+        elif args.component == 'kibana-objects':
             if args.initial_password:
                 password = args.initial_password
             else:
